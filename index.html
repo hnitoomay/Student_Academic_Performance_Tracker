@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -417,6 +418,456 @@
             };
             sendToBackend("high_fails", filters, "resultRisk", () => `Data sent! Check n8n.`);
         }
+    </script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Analytics | Strategy First</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* --- CORE STYLES & COLOR PALETTE --- */
+        :root {
+            --sf-red: #c8102e;
+            --sf-dark-red: #8a0b20;
+            --sf-dark: #1f2229;
+            --sf-gray: #f0f2f5;
+            --sf-border: #e1e4e8;
+            --white: #ffffff;
+            --text-main: #333333;
+            --success: #198754;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--sf-gray);
+            color: var(--text-main);
+        }
+
+        /* --- HEADER --- */
+        header {
+            background: linear-gradient(135deg, var(--sf-red) 0%, var(--sf-dark-red) 100%);
+            color: var(--white);
+            padding: 2rem 1rem;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        header h1 { margin: 0; font-size: 2.2rem; letter-spacing: 1px; }
+        header p { margin: 0.5rem 0 0; opacity: 0.9; font-weight: 300; font-size: 1.1rem; }
+
+        /* --- LAYOUT GRID --- */
+        .container {
+            max-width: 1200px;
+            margin: -2rem auto 3rem;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .upload-section {
+            grid-column: 1 / -1;
+            border-top: 5px solid var(--sf-dark);
+            background-color: var(--white);
+        }
+
+        /* --- CARDS --- */
+        .card {
+            background-color: var(--white);
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            border-top: 4px solid var(--sf-red);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: var(--sf-dark);
+            font-size: 1.4rem;
+            border-bottom: 2px solid var(--sf-gray);
+            padding-bottom: 0.8rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* --- FORMS & INPUTS --- */
+        .form-group { margin-bottom: 1.2rem; }
+        label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; color: #555; }
+        
+        select, input[type="file"] {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--sf-border);
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            background-color: #fafafa;
+        }
+
+        select:focus, input[type="file"]:focus {
+            outline: none;
+            border-color: var(--sf-red);
+            background-color: var(--white);
+        }
+
+        select:disabled { background-color: #eee; cursor: not-allowed; }
+
+        /* --- BUTTONS --- */
+        button {
+            background-color: var(--sf-dark);
+            color: var(--white);
+            border: none;
+            padding: 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: auto;
+            width: 100%;
+        }
+
+        button:hover:not(:disabled) { background-color: var(--sf-red); }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .btn-sync { background-color: var(--sf-red); }
+        .btn-sync:hover:not(:disabled) { background-color: var(--sf-dark-red); }
+
+        /* --- RESULTS DISPLAY --- */
+        .result-box {
+            margin-top: 1.5rem;
+            padding: 1.2rem;
+            background-color: var(--sf-gray);
+            border-left: 4px solid var(--sf-red);
+            border-radius: 0 6px 6px 0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            display: none;
+        }
+        .text-muted {
+            color: #02c222;
+            font-style: italic;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .loading { color: var(--sf-dark); font-weight: bold; font-style: italic; }
+        .highlight { font-weight: bold; color: var(--sf-red); font-size: 1.1rem; }
+        .badge { background: var(--sf-dark); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; margin-left: 5px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Strategy First International College</h1>
+        <p>HNC & HND Automated Performance Dashboard</p>
+    </header>
+
+    <div class="container">
+        
+        <div class="card upload-section">
+            <h2>📁 Step 1: Upload Data Source</h2>
+            <p style="font-size: 0.9rem; color: #666; margin-top: -10px; margin-bottom: 20px;">
+                Upload the latest tracking sheet. 
+            </p>
+            <div class="form-group">
+                <input type="file" id="excel-file" accept=".xlsx, .xls, .csv">
+            </div>
+            <button id="btn-sync" class="btn-sync" onclick="handleFileUpload()">Sync Data & Unlock Dashboard</button>
+            <div id="result-upload" class="result-box" style="border-left-color: var(--success);"></div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Top-Level Analytics</h2>
+             <p class="text-muted">အကျအများဆုံးဘာသာ၊ distinction အများဆုံးဘာသာ ကြည့်ရှုရန်</p>
+            <div class="form-group">
+               
+                <label>Academic Level</label>
+                <select id="lead-level" disabled>
+                    <option value="All">---</option>
+                    <option value="HNC">HNC Only</option>
+                    <option value="HND">HND Only</option>
+                </select>
+            </div>
+            <div class="form-group">
+                
+                <label>Delivery Mode</label>
+                <select id="lead-mode" disabled>
+                    <option value="All">All Modes</option>
+                    <option value="Online">Online</option>
+                    <option value="In-Person">In-Person</option>
+                </select>
+            </div>
+            <button class="action-btn" onclick="fetchLeaderboard()" disabled>Generate Report</button>
+            <div id="result-leaderboard" class="result-box"></div>
+        </div>
+
+        <div class="card" style="border-top-color: #666;">
+            <h2>🔍 Module Deep-Dive</h2>
+            <p class="text-muted">ဘာသာရပ်အလိုက် grading များ ကြည့်ရှုရန်</p>
+            <div class="form-group">
+                
+                <label>Select Module <span class="badge">Dynamic</span></label>
+                <select id="module-select" disabled>
+                    <option value="">Awaiting Data Sync...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Delivery Mode</label>
+                <select id="module-mode" disabled>
+                    <option value="All">All Modes</option>
+                    <option value="Online">Online</option>
+                    <option value="In-Person">In-Person</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Batch <span class="badge">Dynamic</span></label>
+                <select id="module-batch" disabled>
+                    <option value="">Awaiting Data Sync...</option>
+                </select>
+            </div>
+            <button class="action-btn" onclick="fetchModuleData()" disabled>Analyze Module</button>
+            <div id="result-module" class="result-box"></div>
+        </div>
+
+        <div class="card" style="border-top-color: var(--sf-dark);">
+            <h2>👥 Student Retention</h2>
+            <p class="text-muted">Batchအလိုက် Break, Dropouts အရေအတွက်ကြည့်ရန်</p>
+            <div class="form-group">
+                
+                <label>Select Batch <span class="badge">Dynamic</span></label>
+                <select id="status-batch" disabled>
+                    <option value="">Awaiting Data Sync...</option>
+                </select>
+            </div>
+            <button class="action-btn" onclick="fetchStudentStatus()" disabled>Check Status</button>
+            <div id="result-status" class="result-box"></div>
+        </div>
+        <div class="card mt-4">
+    
+            <h2 class="card-title">👥 At-Risk Students</h5>
+            <p class="text-muted">(3)ဘာသာနှင့်အထက်ကျသော ကျောင်းသာအရေအတွက် ကြည့်ရန်</p>
+            
+            <div class="form-group">
+                    
+                    <label>Select Batch <span class="badge">Dynamic</span></label>
+                    <select id="risk-batch" disabled>
+                        <option value="">Awaiting Data Sync...</option>
+                    </select>
+            </div>
+
+            <button id="btnFindRisk" class="action-btn" onclick="fetchHighFails()" disabled>Find Students</button>
+
+            <div class="mt-5 p-3 bg-light border" id="resultRisk" style="min-height: 80px; color:rgb(78, 79, 79)">
+                Results will appear here...
+            </div>
+        
+        </div>
+        <div class="card mt-4">
+                <h2 class="card-title">👥 Completion Rates</h5>
+                <p class="text-muted">HNC, HND Completion Rates</p>
+                
+                <div class="form-group">
+                    
+                        <label>Select Batch <span class="badge">Dynamic</span></label>
+                        <select id="completion-batch" disabled>
+                            <option value="">Awaiting Data Sync...</option>
+                        </select>
+                </div>
+
+                <button id="btnFindCompletion" class="action-btn" onclick="fetchCompletionRates()" disabled>Calculate Completion</button>
+
+                <div class="mt-4 p-3 bg-light border" id="resultCompletion" style="min-height: 80px;">
+                    Results will appear here...
+                </div>
+        </div>
+
+    </div><footer style="text-align: center; margin-top: 40px; padding-bottom: 20px;">
+        <p style="font-size: 12px; color: #ffd0d0; margin: 0;">
+            &copy; 2026 AI Project Team | Developed by H.O.May
+        </p>
+    </footer>
+
+    <script>
+        let currentUploadedFile = null;
+
+        // Helper: Dynamically fill dropdowns
+        function populateDropdown(dropdownId, itemsArray, includeAll = true) {
+            const select = document.getElementById(dropdownId);
+            select.innerHTML = includeAll ? '<option value="All">All Options</option>' : '';
+            itemsArray.forEach(item => {
+                select.innerHTML += `<option value="${item}">${item}</option>`;
+            });
+            select.disabled = false;
+        }
+
+        // Helper: Unlock UI elements
+        function unlockDashboard() {
+            document.querySelectorAll('select, .action-btn').forEach(el => el.disabled = false);
+        }
+
+        // --- 1. REAL EXCEL PARSING USING SHEETJS ---
+        function handleFileUpload() {
+            const fileInput = document.getElementById('excel-file');
+            const resultBox = document.getElementById('result-upload');
+            
+            if (fileInput.files.length === 0) {
+                alert("Please select an Excel file first.");
+                return;
+            }
+
+            currentUploadedFile = fileInput.files[0];
+            resultBox.style.display = "block";
+            resultBox.innerHTML = "<span class='loading'>⏳ Extracting Batches and Modules...</span>";
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                // Convert sheet to an array of rows
+                const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+
+                // Find the header row (look for "Student's Name" or "Batch")
+                let headerRow = [];
+                let headerIndex = -1;
+                for(let i = 0; i < 10; i++) {
+                    if(rows[i] && (rows[i].includes("Batch") || rows[i].includes("Student's Name"))) {
+                        headerRow = rows[i];
+                        headerIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerIndex === -1) {
+                    resultBox.innerHTML = "<span style='color:red;'>❌ Error: Could not find 'Batch' or 'Student's Name' header in the file.</span>";
+                    return;
+                }
+
+                // --- A. EXTRACT ACTUAL BATCHES ---
+                let batchColIndex = headerRow.findIndex(col => typeof col === 'string' && col.includes("Batch"));
+                let uniqueBatches = new Set();
+                
+                if (batchColIndex !== -1) {
+                    for(let i = headerIndex + 1; i < rows.length; i++) {
+                        let batchVal = rows[i][batchColIndex];
+                        if(batchVal) {
+                            // Clean up the text to just say "Batch X"
+                            let cleanedBatch = String(batchVal).replace(/Batch/i, '').trim();
+                            uniqueBatches.add("Batch " + cleanedBatch);
+                        }
+                    }
+                }
+
+                // --- B. EXTRACT MODULES EXACTLY AS THEY APPEAR ---
+                let uniqueModules = new Set();
+
+                headerRow.forEach(header => {
+                    if (header && typeof header === 'string' && header.includes("Unit")) {
+                        // We simply add the exact name found in the Excel sheet
+                        uniqueModules.add(header.trim());
+                    }
+                });
+
+                // --- C. POPULATE THE UI ---
+                // Sort batches numerically if possible
+                let sortedBatches = Array.from(uniqueBatches).sort((a, b) => {
+                    return a.localeCompare(b, undefined, {numeric: true});
+                });
+                
+                let sortedModules = Array.from(uniqueModules).sort();
+
+                populateDropdown('module-batch', sortedBatches);
+                populateDropdown('status-batch', sortedBatches);
+                populateDropdown('module-select', sortedModules, false);
+                populateDropdown('risk-batch', sortedBatches);
+                populateDropdown('completion-batch', sortedBatches);
+                unlockDashboard();
+                resultBox.innerHTML = `✅ Data synced! Found <strong>${uniqueBatches.size} Batches</strong> and <strong>${uniqueModules.size} Modules</strong>.`;
+            };
+
+            reader.readAsArrayBuffer(currentUploadedFile);
+        }
+
+        // --- MOCK N8N BACKEND SUBMISSION (For visual testing) ---
+       // --- REAL N8N BACKEND SUBMISSION ---
+        function sendToBackend(actionType, filterData, resultDivId, formatResponse) {
+            if (!currentUploadedFile) { alert("Please upload a file first."); return; }
+
+            const resultDiv = document.getElementById(resultDivId);
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = "<span class='loading'>⏳ Sending data to n8n...</span>";
+
+            // 1. Package the file and the filters together
+            let formData = new FormData();
+            formData.append("file", currentUploadedFile);
+            formData.append("filters", JSON.stringify({ action: actionType, ...filterData }));
+
+            // 2. Send it to your n8n Webhook
+            // PASTE YOUR N8N TEST URL BELOW
+            fetch("https://n8n.srv1326411.hstgr.cloud/webhook/exam-results", {
+                    
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // THIS IS THE CRITICAL LINE: It must say 'data.html'
+                resultDiv.innerHTML = data.html;
+            })
+            .catch(error => {
+                resultDiv.innerHTML = "<span style='color:red;'>❌ Could not connect. Did you click 'Listen for Test Event' in n8n?</span>";
+                console.error("Webhook Error:", error);
+            });
+        }
+
+        function fetchLeaderboard() {
+            const filters = {
+                level: document.getElementById('lead-level').value,
+                mode: document.getElementById('lead-mode').value
+            };
+            sendToBackend("leaderboard", filters, "result-leaderboard", () => `Data sent! Check n8n.`);
+        }
+
+        function fetchModuleData() {
+            const filters = {
+                module: document.getElementById('module-select').value,
+                mode: document.getElementById('module-mode').value,
+                batch: document.getElementById('module-batch').value
+            };
+            sendToBackend("module_dive", filters, "result-module", () => `Data sent! Check n8n.`);
+        }
+
+        function fetchStudentStatus() {
+            const filters = {
+                batch: document.getElementById('status-batch').value
+            };
+            sendToBackend("student_status", filters, "result-status", () => `Data sent! Check n8n.`);
+        }
+        function fetchHighFails() {
+            const filters = {
+                batch: document.getElementById('risk-batch').value
+            };
+            sendToBackend("high_fails", filters, "resultRisk", () => `Data sent! Check n8n.`);
+        }
+        function fetchCompletionRates() {
+            const filters = {
+                batch: document.getElementById('completion-batch').value
+            };
+            sendToBackend("completion_rates", filters, "resultCompletion", () => `Data sent! Check n8n.`);
+        }
+
     </script>
 </body>
 </html>
